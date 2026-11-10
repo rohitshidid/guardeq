@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GuardEQ: equilibrium guardrail placement</title>
+<style>
+:root {
+  --bg: #ffffff; --ink: #1c1b22; --muted: #6b6b78; --line: #e2d9ee; --tint: #f3eff8;
+  --violet: #57068c; --teal: #0b7a75; --red: #c1121f; --amber: #d98a0b; --blue: #3b7dd8; --gray: #9a9aa5;
+  --ok-bg: #eff7f6; --bad-bg: #fdf2f2;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #15131a; --ink: #ece9f2; --muted: #a29fb0; --line: #37313f; --tint: #211c29;
+          --violet: #b98ae0; --teal: #4fc4bc; --red: #f0737d; --amber: #f0b24a; --blue: #7fb0f0; --gray: #77748a;
+          --ok-bg: #16292a; --bad-bg: #331a1d; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 -apple-system, "Segoe UI", Calibri, sans-serif; }
+main { max-width: 1060px; margin: 0 auto; padding: 28px 16px 80px; }
+h1 { font: 700 30px/1.2 Cambria, Georgia, serif; color: var(--violet); margin: 0 0 4px; }
+h2 { font: 700 20px/1.3 Cambria, Georgia, serif; color: var(--violet); margin: 44px 0 6px; }
+p.lead { color: var(--muted); margin: 0 0 14px; max-width: 70ch; }
+.banner { background: var(--bad-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 16px 0; font-size: 14px; }
+.banner.ok { background: var(--ok-bg); }
+.meta { color: var(--muted); font-size: 13px; }
+.card { background: var(--tint); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.controls { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; margin: 10px 0 14px; }
+.controls label { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+input[type=range] { width: 260px; accent-color: var(--violet); }
+select { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); max-width: 100%; }
+.big { font: 700 34px/1 Cambria, Georgia, serif; color: var(--violet); }
+.stat { text-align: center; } .stat small { display: block; color: var(--muted); margin-top: 4px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 14px 0; }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.mixrow { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: center; margin: 7px 0; font-size: 13px; }
+.mix { display: flex; height: 22px; border-radius: 5px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); }
+.mix span { display: block; height: 100%; color: #fff; font-size: 11px; text-align: center; line-height: 22px; overflow: hidden; white-space: nowrap; }
+.g-none { background: var(--gray); } .g-classifier { background: var(--amber); } .g-judge { background: var(--teal); }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
+.bar { display: grid; grid-template-columns: 150px 1fr 48px; gap: 8px; align-items: center; font-size: 13px; margin: 6px 0; }
+.bar .track { height: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.bar .fill { height: 100%; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 600; }
+.scroll { overflow-x: auto; }
+.heat td { text-align: center; font-variant-numeric: tabular-nums; }
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.tabs button { font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.tabs button.on { background: var(--violet); color: #fff; border-color: var(--violet); }
+@media (prefers-color-scheme: dark) { .tabs button.on { color: #15131a; } }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; color: #fff; margin: 0 4px 4px 0; }
+.p-red { background: var(--red); } .p-teal { background: var(--teal); } .p-gray { background: var(--gray); } .p-amber { background: var(--amber); } .p-violet { background: var(--violet); }
+@media (prefers-color-scheme: dark) { .pill { color: #15131a; } }
+pre { white-space: pre-wrap; word-break: break-word; font: 12.5px/1.5 ui-monospace, Menlo, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 6px 0; }
+mark { background: var(--bad-bg); color: var(--red); padding: 0 2px; border-radius: 3px; }
+.msg { margin: 6px 0; } .msg b { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+svg text { fill: var(--muted); font-size: 11px; }
+footer { color: var(--muted); font-size: 12.5px; margin-top: 48px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>GuardEQ</h1>
+  <p class="lead">Equilibrium guardrail placement for tool-using LLM agents. A defender with a limited budget commits to a random mix of guardrails at each entry point; an attacker sees the mix and picks where to strike. This page replays saved results. It makes no model calls.</p>
+  <div id="banner"></div>
+  <div class="meta" id="meta"></div>
+
+  <h2>The equilibrium policy</h2>
+  <p class="lead">Move the budget. The solver's mix for each entry point updates, along with the predicted worst-case damage for it and for the five baseline policies.</p>
+  <div class="controls">
+    <label>Budget <input type="range" id="budget" min="0" max="20" value="10"> <b id="budgetLabel"></b></label>
+    <label>&lambda; (weight on false blocks) <select id="lam"></select></label>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="grid2">
+    <div class="card">
+      <b>GuardEQ mix per entry point</b>
+      <div id="mix"></div>
+      <div class="legend"><span><i class="g-none"></i>None</span><span><i class="g-classifier"></i>Classifier</span><span><i class="g-judge"></i>LLM judge</span></div>
+    </div>
+    <div class="card">
+      <b>Predicted worst-case damage at this budget</b>
+      <div id="bars"></div>
+      <div class="meta">Fixed baselines ignore the budget: "judge everywhere" always costs the full amount.</div>
+    </div>
+  </div>
+
+  <h2>Security versus cost</h2>
+  <p class="lead">Worst-case damage as the budget grows, from nothing up to an LLM judge on every read.</p>
+  <div class="card"><div id="curve"></div><div class="legend" id="curveLegend"></div></div>
+
+  <h2>Measured payoffs</h2>
+  <p class="lead">How often each attack type worked at each entry point, under each guardrail. These numbers feed the solver.</p>
+  <div class="card">
+    <div class="tabs" id="guardTabs"></div>
+    <div class="scroll"><table class="heat" id="heat"></table></div>
+    <div class="meta" id="payoffNote"></div>
+  </div>
+
+  <h2>Against the LLM attacker</h2>
+  <p class="lead">Each policy faced an LLM attacker that was told the policy and chose its own target and wording. "Best response" is how often it picked a target the model says is optimal.</p>
+  <div class="card scroll"><table id="evalTable"></table></div>
+
+  <h2>Replay a run</h2>
+  <p class="lead">Every trial is logged. Pick one to see what the agent read, what the guardrail removed, and what the agent did.</p>
+  <div class="controls">
+    <label>Show <select id="runFilter"><option value="all">all runs</option><option value="success">attack succeeded</option><option value="blocked">injection blocked</option><option value="eval">attacker-written</option><option value="normal">normal tasks</option></select></label>
+    <label>Run <select id="runPick"></select></label>
+  </div>
+  <div class="card" id="run"></div>
+
+  <footer>GuardEQ &middot; Rohit Shidid &middot; ECE-GY 6263 Game Theory, NYU Tandon. All workspace content is synthetic; no real accounts or data are involved.</footer>
+</main>
+<script src="data.js"></script>
+<script>
+const D = window.GUARDEQ;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const fmt = (x, d = 2) => Number(x).toFixed(d);
+const COLORS = { sse: "var(--violet)", none: "var(--gray)", classifier: "var(--amber)", judge: "var(--teal)", random: "var(--blue)", greedy: "var(--red)" };
+
+if (!D) {
+  document.querySelector("main").innerHTML = "<h1>GuardEQ</h1><p>No data yet. Run <code>python -m guardeq all</code> to generate <code>docs/data.js</code>.</p>";
+} else {
+  const S = D.sets;
+  $("banner").innerHTML = D.meta.profile === "full"
+    ? `<div class="banner ok"><b>Full study.</b> ${D.meta.n_attack} trials per attack setting, ${D.meta.n_eval} attacker runs per policy and budget.</div>`
+    : `<div class="banner"><b>Preliminary data (${esc(D.meta.profile)} profile).</b> Only ${D.meta.n_attack} trials per attack setting and ${D.meta.n_eval} attacker runs per policy, so the numbers are noisy. They show that the pipeline works, not what the answer is.</div>`;
+  $("meta").textContent = `${D.meta.trials} logged trials · agent ${D.meta.agent_model} · judge ${D.meta.judge_model} · attacker ${D.meta.attacker_model} · built ${D.meta.built}`;
+
+  const lams = Object.keys(D.fine);
+  $("lam").innerHTML = lams.map((l) => `<option ${Number(l) === D.meta.lam ? "selected" : ""}>${l}</option>`).join("");
+
+  function step() { return D.fine[$("lam").value][Number($("budget").value)]; }
+
+  function renderPolicy() {
+    const s = step(), sse = s.policies.sse;
+    $("budgetLabel").textContent = `${Math.round(s.fraction * 100)}% of full`;
+    const none = s.policies.none.worst_case;
+    const cut = none > 0 ? Math.round((1 - sse.worst_case / none) * 100) : 0;
+    $("stats").innerHTML = [
+      [fmt(sse.worst_case), "worst-case damage"],
+      [cut + "%", "lower than no guardrails"],
+      [fmt(sse.cost, 2) + "s", "added delay per task"],
+      [fmt(sse.false_block_harm, 3), "false-block harm"],
+    ].map(([v, l]) => `<div class="card stat"><div class="big">${v}</div><small>${l}</small></div>`).join("");
+    $("mix").innerHTML = S.entries.map((t) => {
+      const spans = S.guards.map((g) => {
+        const p = sse.policy[t][g];
+        return p > 0.004 ? `<span class="g-${g}" style="width:${p * 100}%" title="${S.guard_labels[g]} ${fmt(p)}">${p >= 0.12 ? fmt(p) : ""}</span>` : "";
+      }).join("");
+      return `<div class="mixrow"><div>${S.entry_labels[t]}</div><div class="mix">${spans}</div></div>`;
+    }).join("");
+    const max = Math.max(...S.policies.map((n) => s.policies[n].worst_case), 0.01);
+    $("bars").innerHTML = S.policies.map((n) => {
+      const p = s.policies[n];
+      return `<div class="bar"><div>${S.policy_labels[n]}</div><div class="track"><div class="fill" style="width:${(p.worst_case / max) * 100}%;background:${COLORS[n]}"></div></div><div>${fmt(p.worst_case)}</div></div>`;
+    }).join("");
+    renderCurve();
+  }
+
+  function renderCurve() {
+    const steps = D.fine[$("lam").value], W = 720, H = 260, L = 46, B = 34, T = 12, Rt = 14;
+    const ymax = Math.max(...steps.flatMap((s) => S.policies.map((n) => s.policies[n].worst_case)), 0.05) * 1.08;
+    const x = (f) => L + f * (W - L - Rt), y = (v) => T + (1 - v / ymax) * (H - T - B);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Worst-case damage versus budget">`;
+    for (let i = 0; i <= 4; i++) {
+      const v = (ymax * i) / 4;
+      svg += `<line x1="${L}" x2="${W - Rt}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v)}</text>`;
+    }
+    for (let i = 0; i <= 5; i++) svg += `<text x="${x(i / 5)}" y="${H - 14}" text-anchor="middle">${i * 20}%</text>`;
+    svg += `<text x="${(L + W - Rt) / 2}" y="${H - 1}" text-anchor="middle">budget, as a share of "LLM judge everywhere" cost</text>`;
+    for (const n of ["random", "greedy", "sse"]) {
+      const pts = steps.map((s) => `${x(s.fraction)},${y(s.policies[n].worst_case)}`).join(" ");
+      svg += `<polyline points="${pts}" fill="none" stroke="${COLORS[n]}" stroke-width="${n === "sse" ? 3 : 1.8}"/>`;
+    }
+    const full = D.judge_everywhere_cost || 1;
+    for (const n of ["none", "classifier", "judge"]) {
+      const p = steps[0].policies[n];
+      svg += `<circle cx="${x(Math.min(1, p.cost / full))}" cy="${y(p.worst_case)}" r="5" fill="${COLORS[n]}"/>`;
+    }
+    const cur = step();
+    svg += `<line x1="${x(cur.fraction)}" x2="${x(cur.fraction)}" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="4 4"/>`;
+    $("curve").innerHTML = svg + "</svg>";
+    $("curveLegend").innerHTML = S.policies.map((n) => `<span><i style="background:${COLORS[n]}"></i>${S.policy_labels[n]}</span>`).join("")
+      + (D.budget_to_match_judge != null ? `<span>GuardEQ matches "judge everywhere" at ${Math.round(D.budget_to_match_judge * 100)}% of its cost</span>` : "");
+  }
+
+  let guard = "none";
+  function renderHeat() {
+    $("guardTabs").innerHTML = S.guards.map((g) => `<button class="${g === guard ? "on" : ""}" data-g="${g}">${S.guard_labels[g]}</button>`).join("");
+    let html = `<tr><th>Entry point</th>${S.attacks.map((a) => `<th style="text-align:center">${S.attack_labels[a]}</th>`).join("")}<th>False block</th><th>Task success</th></tr>`;
+    for (const t of S.entries) {
+      html += `<tr><td>${S.entry_labels[t]}</td>` + S.attacks.map((a) => {
+        const p = D.payoffs.P[t][guard][a], d = D.payoffs.P_detail[t][guard][a];
+        return `<td title="${d.k}/${d.n}, 95% CI ${fmt(d.ci[0])}–${fmt(d.ci[1])}" style="background:color-mix(in srgb, var(--violet) ${Math.round(p * 75)}%, transparent)">${fmt(p)}</td>`;
+      }).join("") + `<td>${fmt(D.payoffs.R[t][guard])}</td><td>${fmt(D.payoffs.task_success[t][guard].rate)}</td></tr>`;
+    }
+    $("heat").innerHTML = html;
+    $("payoffNote").textContent = `Mean check cost: ${S.guards.map((g) => `${S.guard_labels[g]} ${fmt(D.payoffs.K[g], 3)}s`).join(" · ")}. Hover a cell for counts and its 95% interval.`;
+    document.querySelectorAll("#guardTabs button").forEach((b) => (b.onclick = () => { guard = b.dataset.g; renderHeat(); }));
+  }
+
+  function renderEval() {
+    if (!D.eval.length) { $("evalTable").innerHTML = "<tr><td>No attacker runs in this data set.</td></tr>"; return; }
+    let html = "<tr><th>Policy</th><th>Budget</th><th>Runs</th><th>Attack success</th><th>Realized damage</th><th>Predicted worst case</th><th>Gap</th><th>Best response</th></tr>";
+    for (const r of D.eval) {
+      html += `<tr><td>${S.policy_labels[r.policy]}</td><td>${Math.round(r.budget_fraction * 100)}%</td><td>${r.n}</td><td>${fmt(r.attack_success)}</td><td>${fmt(r.realized_damage)}</td><td>${fmt(r.predicted_worst_case)}</td><td>${fmt(r.prediction_gap)}</td><td>${Math.round(r.best_response_rate * 100)}%</td></tr>`;
+    }
+    $("evalTable").innerHTML = html;
+  }
+
+  function runList() {
+    const f = $("runFilter").value;
+    return D.runs.filter((r) => f === "all" || (f === "success" && r.attack_success) || (f === "blocked" && r.inject_blocked)
+      || (f === "eval" && r.phase === "eval") || (f === "normal" && r.kind === "normal"));
+  }
+  function renderRunPick() {
+    const list = runList();
+    $("runPick").innerHTML = list.map((r) => {
+      const what = r.kind === "attack" ? `${S.attack_labels[r.attack_type]} attack` : "normal task";
+      const how = r.kind === "attack" ? (r.attack_success ? "succeeded" : r.inject_blocked ? "blocked" : "ignored") : (r.task_done ? "done" : "failed");
+      return `<option value="${esc(r.id)}">${S.entry_labels[r.entry_point]} · ${S.guard_labels[r.guardrail]} · ${what} · ${how}</option>`;
+    }).join("");
+    renderRun();
+  }
+  function renderRun() {
+    const r = D.runs.find((x) => x.id === $("runPick").value);
+    if (!r) { $("run").innerHTML = "<span class='meta'>No runs match this filter.</span>"; return; }
+    let doc = esc(r.document);
+    for (const p of r.payload || []) doc = doc.replace(esc(p), `<mark>${esc(p)}</mark>`);
+    const pills = [
+      `<span class="pill p-violet">${S.entry_labels[r.entry_point]}</span>`,
+      `<span class="pill p-${r.guardrail === "judge" ? "teal" : r.guardrail === "classifier" ? "amber" : "gray"}">guardrail: ${S.guard_labels[r.guardrail]}</span>`,
+      r.kind === "attack" ? `<span class="pill ${r.attack_success ? "p-red" : "p-teal"}">attack ${r.attack_success ? "succeeded" : "failed"}</span>` : "",
+      r.inject_blocked ? `<span class="pill p-teal">injection removed</span>` : "",
+      r.false_block ? `<span class="pill p-red">false block</span>` : "",
+      `<span class="pill ${r.task_done ? "p-teal" : "p-gray"}">task ${r.task_done ? "done" : "not done"}</span>`,
+      r.policy_name ? `<span class="pill p-violet">${S.policy_labels[r.policy_name]} @ ${Math.round(r.budget_fraction * 100)}%</span>` : "",
+      r.chose_best_response != null ? `<span class="pill ${r.chose_best_response ? "p-red" : "p-gray"}">${r.chose_best_response ? "picked a best response" : "not a best response"}</span>` : "",
+    ].join("");
+    const removed = r.checks.filter((c) => c.flagged).length;
+    let html = `${pills}<div class="msg"><b>User request</b><pre>${esc(r.question)}</pre></div>`;
+    if (r.attacker && r.attacker.reasoning) html += `<div class="msg"><b>Attacker's reasoning</b><pre>${esc(r.attacker.reasoning)}</pre></div>`;
+    html += `<div class="msg"><b>Document as planted (injection highlighted) · guardrail removed ${removed} of ${r.checks.length} segments</b><pre>${doc}</pre></div>`;
+    html += `<div class="msg"><b>What the agent did</b></div>`;
+    for (const m of r.transcript.slice(1)) html += `<div class="msg"><b>${m.role === "assistant" ? "agent" : "tool result"}</b><pre>${esc(m.content)}</pre></div>`;
+    $("run").innerHTML = html;
+  }
+
+  $("budget").oninput = renderPolicy; $("lam").onchange = renderPolicy;
+  $("runFilter").onchange = renderRunPick; $("runPick").onchange = renderRun;
+  renderPolicy(); renderHeat(); renderEval(); renderRunPick();
+}
+</script>
+</body>
+</html>
