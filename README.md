@@ -11,6 +11,20 @@ best mix.
 
 Term project for ECE-GY 6263 Game Theory (NYU Tandon, Fall 2026), by Rohit Shidid.
 
+## Results (full study, 2,580 logged trials)
+
+Agent, judge and attacker: `gemma4` via Ollama; second model family: `llama3.2`. Report: [`report/report.pdf`](report/report.pdf).
+
+| Question | Answer |
+|---|---|
+| 1. Lower worst case than simple policies at the same cost? | Yes, at every intermediate budget. At 20% of the judge-everywhere cost: 0.11 vs 0.64 (random) and 0.63 (greedy). |
+| 2. Budget to match an LLM judge everywhere? | Exactly only at 100% (the judge had 0/320 successes). Within 0.05 at 60%; safer than classifier-everywhere from 5%. |
+| 3. Does an LLM attacker that knows the policy best-respond? | 57% of the time. It attacked tool output (highest damage value) in 98% of 900 runs, a rule of thumb rather than a best response. |
+| 4. How sensitive? | Stable to λ and to damage values (policy shift ≤ 0.16). Reusing the gemma4 policy on llama3.2 costs 0.05 in worst case. Planning for the 95% upper bounds, no policy can be certified below 0.16 with 20 trials per cell. |
+
+Realized damage of the equilibrium against the LLM attacker stayed at or below its prediction at every budget
+(0.00 / 0.04 / 0.00 at 25 / 50 / 75%). One held-out split attack got past the per-segment LLM judge.
+
 ## What is in here
 
 | Path | What it does |
@@ -28,6 +42,7 @@ Term project for ECE-GY 6263 Game Theory (NYU Tandon, Fall 2026), by Rohit Shidi
 | `results/<profile>/` | Payoff tables, policies, summaries and figures |
 | `docs/index.html` | Static demo that replays saved results |
 | `report/` | The report, as Markdown and PDF |
+| `presentation/` | Final slides (`GuardEQ_Final_Presentation.pptx`), demo video (`GuardEQ_Demo.mp4`), and the scripts that build them from the results (`node build_deck.js full`, `node record_demo.js`, `python3 build_script.py`) |
 
 ## Setup
 
@@ -46,7 +61,7 @@ Groq key is usable.
 ## Run it
 
 ```bash
-python -m unittest discover -s tests          # 24 tests, a second or so, no model needed
+python -m unittest discover -s tests          # 25 tests, a second or so, no model needed
 python -m guardeq all --profile smoke         # small end-to-end run, about 15 minutes
 python -m guardeq all --profile full          # the full study, several hours
 ```

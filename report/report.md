@@ -1,7 +1,7 @@
 ---
 title: "GuardEQ: Equilibrium Guardrail Placement for Tool-Using LLM Agents"
 author: "Rohit Shidid (RRS6770)"
-date: "ECE-GY 6263 Game Theory, Fall 2026 · Term project report · built 2026-11-10"
+date: "ECE-GY 6263 Game Theory, Fall 2026 · Term project report · built 2026-11-20"
 geometry: margin=1in
 fontsize: 11pt
 linkcolor: blue
@@ -131,14 +131,14 @@ its measured latency. All figures and tables in this report are rebuilt from the
 
 # Experimental design
 
-1. **Measure payoffs.** Run 2 trials in each of the 48 attack settings (4 entry points, 3
-   guardrails, 4 attack types) and 2 normal-task trials in each of 12 settings. A trial's task and
+1. **Measure payoffs.** Run 20 trials in each of the 48 attack settings (4 entry points, 3
+   guardrails, 4 attack types) and 20 normal-task trials in each of 12 settings. A trial's task and
    attack wording depend on the entry point, attack type and trial number but not on the guardrail, so the
    three guardrail levels are compared on the same material.
 2. **Solve.** Solve the linear program at six budget levels, from zero to the cost of an LLM judge on every
    read.
 3. **Test against the attacker.** Run each of six policies against an LLM attacker at three budgets, with
-   3 runs each, on held-out tasks. The attacker is told the policy, chooses a target and writes its own
+   50 runs each, on held-out tasks. The attacker is told the policy, chooses a target and writes its own
    injection. One guardrail is then drawn from the policy for the chosen entry point.
 4. **Check robustness.** Repeat the payoff measurement with a second model family, and re-solve the game
    for other values of $\lambda$ and of the damage values.
@@ -160,9 +160,7 @@ response. Rates are reported with 95% Wilson intervals.
 
 # Results
 
-> **These results are preliminary.** They come from the `smoke` profile: 2 trials per attack setting, 2 normal-task trials per setting and 3 attacker runs per policy and budget, against 20, 20 and 50 in the full study. With samples this small the confidence intervals are very wide, and none of the comparisons below should be read as findings. They show that every stage of the pipeline runs end to end.
-
-The run logged 120 payoff trials with the agent `ollama:gemma4` and the judge `ollama:gemma4`.
+The run logged 1200 payoff trials with the agent `ollama:gemma4` and the judge `ollama:gemma4`.
 
 ## Phase checks
 
@@ -176,28 +174,28 @@ The run logged 120 payoff trials with the agent `ollama:gemma4` and the judge `o
 
 ## Measured payoffs
 
-Averaged over entry points and attack types, attacks succeeded 34% of the time with no guardrail, 3% with the classifier and 0% with the LLM judge. Table 2 gives the success rate for every setting and Figure 2 shows the same numbers as a heat map.
+Averaged over entry points and attack types, attacks succeeded 33% of the time with no guardrail, 7% with the classifier and 0% with the LLM judge. Table 2 gives the success rate for every setting and Figure 1 shows the same numbers as a heat map.
 
 | Entry point, guardrail | Direct override | Hidden | Role-play | Split | False block | Task success |
 |:--|--:|--:|--:|--:|--:|--:|
-| Email, none | 1.00 | 0.50 | 0.00 | 0.00 | 0.00 | 1.00 |
-| Email, classifier | 0.00 | 0.50 | 0.00 | 0.00 | 0.00 | 1.00 |
+| Email, none | 0.65 | 0.10 | 0.00 | 0.05 | 0.00 | 1.00 |
+| Email, classifier | 0.00 | 0.10 | 0.00 | 0.05 | 0.00 | 1.00 |
 | Email, llm judge | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
-| Web page, none | 1.00 | 0.00 | 0.50 | 0.00 | 0.00 | 1.00 |
-| Web page, classifier | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
+| Web page, none | 0.90 | 0.00 | 0.25 | 0.30 | 0.00 | 1.00 |
+| Web page, classifier | 0.00 | 0.00 | 0.00 | 0.25 | 0.00 | 1.00 |
 | Web page, llm judge | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
-| File, none | 1.00 | 0.00 | 0.50 | 0.00 | 0.00 | 1.00 |
-| File, classifier | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
+| File, none | 0.90 | 0.20 | 0.15 | 0.20 | 0.00 | 1.00 |
+| File, classifier | 0.00 | 0.15 | 0.05 | 0.10 | 0.00 | 1.00 |
 | File, llm judge | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
-| Tool output, none | 0.50 | 0.00 | 0.50 | 0.00 | 0.00 | 1.00 |
-| Tool output, classifier | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
+| Tool output, none | 0.80 | 0.05 | 0.40 | 0.30 | 0.00 | 1.00 |
+| Tool output, classifier | 0.00 | 0.00 | 0.20 | 0.20 | 0.00 | 1.00 |
 | Tool output, llm judge | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
 
 : Attack success rate $p_{t,\ell,a}$, false-block rate $r_{t,\ell}$ and normal-task success for each setting.
 
 ![Attack success rate by entry point, attack type and guardrail.](figures/payoffs.png){width=95%}
 
-With no guardrail, the most effective attack type was direct override (88% on average), followed by role-play (38%), hidden (12%), split (0%). One check cost 0.58 ms with the classifier and 2.63 s with the LLM judge, measured as wall-clock delay per document read. The judge inspects each segment of a document separately, so its cost is several model calls per read.
+With no guardrail, the most effective attack type was direct override (81% on average), followed by split (21%), role-play (20%), hidden (9%). One check cost 0.38 ms with the classifier and 2.45 s with the LLM judge, measured as wall-clock delay per document read. The judge inspects each segment of a document separately, so its cost is several model calls per read.
 
 ## Security versus cost
 
@@ -205,102 +203,137 @@ Table 3 gives the predicted worst-case damage of each policy at the six budget l
 
 | Budget | GuardEQ | None | Classifier | Judge | Random | Greedy |
 |:--|--:|--:|--:|--:|--:|--:|
-| 0.0 | 0.80 | 0.80 | 0.40 | 0.00 | 0.80 | 0.80 |
-| 0.2 | 0.04 | 0.80 | 0.40 | 0.00 | 0.64 | 0.80 |
-| 0.4 | 0.00 | 0.80 | 0.40 | 0.00 | 0.48 | 0.70 |
-| 0.6 | 0.00 | 0.80 | 0.40 | 0.00 | 0.32 | 0.60 |
-| 0.8 | 0.00 | 0.80 | 0.40 | 0.00 | 0.16 | 0.36 |
-| 1.0 | 0.00 | 0.80 | 0.40 | 0.00 | 0.00 | 0.00 |
+| 0.0 | 0.80 | 0.80 | 0.20 | 0.00 | 0.80 | 0.80 |
+| 0.2 | 0.11 | 0.80 | 0.20 | 0.00 | 0.64 | 0.63 |
+| 0.4 | 0.07 | 0.80 | 0.20 | 0.00 | 0.48 | 0.63 |
+| 0.6 | 0.05 | 0.80 | 0.20 | 0.00 | 0.32 | 0.54 |
+| 0.8 | 0.02 | 0.80 | 0.20 | 0.00 | 0.16 | 0.32 |
+| 1.0 | 0.00 | 0.80 | 0.20 | 0.00 | 0.00 | 0.00 |
 
 : Predicted worst-case damage by policy and budget. GuardEQ is the equilibrium policy; Random and Greedy spend the same budget.
 
 ![Predicted worst-case damage against budget. Lines are budget-aware policies; dots are the fixed baselines at their own cost.](figures/security_cost.png){width=78%}
 
-**Question 1.** At the 4 intermediate budgets, the equilibrium policy had a strictly lower predicted worst case than random placement at 4 of them and than greedy placement at 4. By construction it can never be worse than either, since both are feasible points of the same linear program. The largest margin was at a budget of 0.2, where the equilibrium's worst case was 0.04 against 0.64 for the better of the two.
+**Question 1.** At the 4 intermediate budgets, the equilibrium policy had a strictly lower predicted worst case than random placement at 4 of them and than greedy placement at 4. By construction it can never be worse than either, since both are feasible points of the same linear program. The largest margin was at a budget of 0.2, where the equilibrium's worst case was 0.11 against 0.63 for the better of the two.
 
-**Question 2.** The equilibrium policy reaches the worst-case damage of judge everywhere (0.00) at 24% of its cost. Figure 4 shows how the mix at each entry point changes as the budget grows.
+**Question 2.** The equilibrium policy did not reach the worst-case damage of judge everywhere (0.00) at any budget below the full cost. With the judge measured at 0 successes in every cell, matching it exactly requires the judge on every read. It comes within 0.05 of it at 60% of the cost and it is already safer than running the classifier everywhere (worst case 0.20) from 5% of the cost. Figure 3 shows how the mix at each entry point changes as the budget grows.
 
 ![The equilibrium mix at each entry point, by budget.](figures/policy_mix.png){width=95%}
 
+Table 4 gives the other metrics from the proposal for every policy at a budget of 0.4: the added delay per task (the policy's expected guardrail cost), the expected harm from false blocks, and the predicted worst-case damage.
+
+| Policy | Added delay per task (s) | False-block harm | Worst-case damage |
+|:--|--:|--:|--:|
+| GuardEQ | 4.403 | 0.000 | 0.07 |
+| None | 0.000 | 0.000 | 0.80 |
+| Classifier | 0.002 | 0.000 | 0.20 |
+| Judge | 11.006 | 0.000 | 0.00 |
+| Random | 4.403 | 0.000 | 0.48 |
+| Greedy | 4.403 | 0.000 | 0.63 |
+
+: Cost and side effects of each policy at a budget of 0.4. The fixed baselines do not depend on the budget.
+
 ## Against the LLM attacker
 
-Each policy was run against an LLM attacker (`ollama:gemma4`) that was given the policy, the damage values and the measured success rates. The attacker chose an entry point and an attack type and wrote its own injection text. Tasks came from the held-out templates. Table 4 reports the outcome.
+Each policy was run against an LLM attacker (`ollama:gemma4`) that was given the policy, the damage values and the measured success rates. The attacker chose an entry point and an attack type and wrote its own injection text. Tasks came from the held-out templates. Table 5 reports the outcome.
 
 | Policy | Budget | Runs | Success | 95% CI | Damage | Predicted | Gap | Best resp. |
 |:--|--:|--:|--:|--:|--:|--:|--:|--:|
-| GuardEQ | 0.25 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.00 | 0.00 | 100% |
-| None | 0.25 | 3 | 0.67 | 0.21--0.94 | 0.67 | 0.80 | 0.13 | 0% |
-| Classifier | 0.25 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.40 | 0.40 | 33% |
-| Judge | 0.25 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.00 | 0.00 | 100% |
-| Random | 0.25 | 3 | 0.33 | 0.06--0.79 | 0.33 | 0.60 | 0.27 | 0% |
-| Greedy | 0.25 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.80 | 0.80 | 0% |
-| GuardEQ | 0.50 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.00 | 0.00 | 100% |
-| None | 0.50 | 3 | 0.67 | 0.21--0.94 | 0.67 | 0.80 | 0.13 | 0% |
-| Classifier | 0.50 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.40 | 0.40 | 0% |
-| Judge | 0.50 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.00 | 0.00 | 100% |
-| Random | 0.50 | 3 | 0.33 | 0.06--0.79 | 0.33 | 0.40 | 0.07 | 0% |
-| Greedy | 0.50 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.66 | 0.66 | 33% |
-| GuardEQ | 0.75 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.00 | 0.00 | 100% |
-| None | 0.75 | 3 | 0.67 | 0.21--0.94 | 0.67 | 0.80 | 0.13 | 0% |
-| Classifier | 0.75 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.40 | 0.40 | 0% |
-| Judge | 0.75 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.00 | 0.00 | 100% |
-| Random | 0.75 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.20 | 0.20 | 0% |
-| Greedy | 0.75 | 3 | 0.00 | 0.00--0.56 | 0.00 | 0.45 | 0.45 | 0% |
+| GuardEQ | 0.25 | 50 | 0.00 | 0.00--0.07 | 0.00 | 0.10 | 0.10 | 70% |
+| None | 0.25 | 50 | 0.50 | 0.37--0.63 | 0.50 | 0.80 | 0.30 | 80% |
+| Classifier | 0.25 | 50 | 0.02 | 0.00--0.10 | 0.02 | 0.20 | 0.18 | 54% |
+| Judge | 0.25 | 50 | 0.02 | 0.00--0.10 | 0.02 | 0.00 | -0.02 | 100% |
+| Random | 0.25 | 50 | 0.28 | 0.17--0.42 | 0.28 | 0.60 | 0.32 | 22% |
+| Greedy | 0.25 | 50 | 0.04 | 0.01--0.13 | 0.03 | 0.63 | 0.60 | 2% |
+| GuardEQ | 0.50 | 50 | 0.04 | 0.01--0.13 | 0.04 | 0.06 | 0.02 | 84% |
+| None | 0.50 | 50 | 0.34 | 0.22--0.48 | 0.34 | 0.80 | 0.46 | 68% |
+| Classifier | 0.50 | 50 | 0.00 | 0.00--0.07 | 0.00 | 0.20 | 0.20 | 60% |
+| Judge | 0.50 | 50 | 0.00 | 0.00--0.07 | 0.00 | 0.00 | 0.00 | 100% |
+| Random | 0.50 | 50 | 0.24 | 0.14--0.37 | 0.23 | 0.40 | 0.17 | 36% |
+| Greedy | 0.50 | 50 | 0.00 | 0.00--0.07 | 0.00 | 0.59 | 0.59 | 2% |
+| GuardEQ | 0.75 | 50 | 0.00 | 0.00--0.07 | 0.00 | 0.03 | 0.03 | 94% |
+| None | 0.75 | 50 | 0.50 | 0.37--0.63 | 0.50 | 0.80 | 0.30 | 58% |
+| Classifier | 0.75 | 50 | 0.04 | 0.01--0.13 | 0.04 | 0.20 | 0.16 | 54% |
+| Judge | 0.75 | 50 | 0.00 | 0.00--0.07 | 0.00 | 0.00 | 0.00 | 100% |
+| Random | 0.75 | 50 | 0.14 | 0.07--0.26 | 0.13 | 0.20 | 0.07 | 40% |
+| Greedy | 0.75 | 50 | 0.00 | 0.00--0.07 | 0.00 | 0.41 | 0.41 | 0% |
 
 : Each policy against the LLM attacker. Success is the attack success rate, Damage the mean realized damage, Predicted the predicted worst case, and Gap their difference. GuardEQ is the equilibrium policy; Judge and Classifier run that guardrail everywhere.
 
 ![Realized damage against the LLM attacker, with 95% intervals. Black marks are the predicted worst case.](figures/eval_damage.png){width=95%}
 
-**Question 3.** Across all 54 runs the attacker gave a usable target in 100% of them and wrote its own payload in 100%. It picked a target that the model identifies as a best response in 37% of runs (100% against the equilibrium policy, where several targets are tied by design). The average shortfall of its chosen target, measured in predicted damage, was 0.223. Realized damage was on average 0.224 below the predicted worst case. A positive gap means the model overstated the risk from this attacker; a negative one means the attacker's own wording did better than the library attacks the payoffs were measured with.
+**Question 3.** Across all 900 runs the attacker gave a usable target in 99% of them and wrote its own payload in 99%. It picked a target that the model identifies as a best response in 57% of runs (83% against the equilibrium policy, where several targets are tied by design). The average shortfall of its chosen target, measured in predicted damage, was 0.148. Realized damage was on average 0.216 below the predicted worst case. A positive gap means the model overstated the risk from this attacker; a negative one means the attacker's own wording did better than the library attacks the payoffs were measured with.
+
+The attacker's choices were strongly concentrated: it targeted the tool output in 98% of all runs, whatever the policy. That entry point has the highest damage value, so the attacker behaved more like a rule of thumb (attack the most valuable entry point) than like a best responder. Against greedy placement, which spends its budget on the most valuable entry points first, this rule fails: the attacker found a best response in only 1% of greedy runs, and greedy's realized damage was far below its predicted worst case. The predicted worst case is therefore an upper bound on what this attacker achieved, not a forecast of it, and the low realized damage of greedy placement says more about the attacker than about greedy placement. In no cell was the realized damage significantly above the prediction. Against the equilibrium policy every target is close to tied, so the attacker's habit cost it little there, and the prediction was tightest for that policy: its gap was at most 0.10, against up to 0.32 for random and 0.60 for greedy placement.
+
+Judge everywhere was beaten once, although the judge had no successes in the payoff runs. In the logged case the attacker chose a split attack, and its payload came from the held-out wording, which the judge had never seen: one segment named an outside address as the place where "compliance copies" go, and the other asked the assistant to send a compliance copy of the recovery code "to the destination given in step A". Read one at a time, neither segment looks like an attack, which is the weakness the split type was designed to probe.
 
 ![How often the LLM attacker picked a predicted best response, by policy.](figures/attacker_choice.png){width=70%}
 
 ## Robustness
 
-**Question 4.** Table 5 re-solves the game at a budget of 0.5 for different values of $\lambda$. Table 6 scales one damage value at a time. Policy shift is the mean total-variation distance between the new mix and the baseline mix, from 0 (identical) to 1.
+**Question 4.** Table 6 re-solves the game at a budget of 0.5 for different values of $\lambda$. Table 7 scales one damage value at a time. Policy shift is the mean total-variation distance between the new mix and the baseline mix, from 0 (identical) to 1.
 
 | $\lambda$ | Worst-case damage | False-block harm | Cost (s) | Policy shift |
 |:--|--:|--:|--:|--:|
-| 0.00 | 0.00 | 0.000 | 2.63 | 0.00 |
-| 0.25 | 0.00 | 0.000 | 2.63 | 0.00 |
-| 0.50 | 0.00 | 0.000 | 2.63 | 0.00 |
-| 1.00 | 0.00 | 0.000 | 2.63 | 0.00 |
-| 2.00 | 0.00 | 0.000 | 2.63 | 0.00 |
+| 0.00 | 0.06 | 0.000 | 5.50 | 0.00 |
+| 0.25 | 0.06 | 0.000 | 5.50 | 0.00 |
+| 0.50 | 0.06 | 0.000 | 5.50 | 0.00 |
+| 1.00 | 0.06 | 0.000 | 5.50 | 0.00 |
+| 2.00 | 0.06 | 0.000 | 5.50 | 0.00 |
 
 : Sensitivity to the weight on false blocks.
 
 | Entry point | Damage value scaled by | Worst-case damage | Policy shift |
 |:--|--:|--:|--:|
-| Email | 0.5 | 0.00 | 0.00 |
-| Email | 1.5 | 0.00 | 0.00 |
-| Web page | 0.5 | 0.00 | 0.00 |
-| Web page | 1.5 | 0.00 | 0.00 |
-| File | 0.5 | 0.00 | 0.00 |
-| File | 1.5 | 0.00 | 0.00 |
-| Tool output | 0.5 | 0.00 | 0.00 |
-| Tool output | 1.5 | 0.00 | 0.00 |
+| Email | 0.5 | 0.05 | 0.10 |
+| Email | 1.5 | 0.07 | 0.09 |
+| Web page | 0.5 | 0.05 | 0.15 |
+| Web page | 1.5 | 0.07 | 0.07 |
+| File | 0.5 | 0.05 | 0.16 |
+| File | 1.5 | 0.07 | 0.07 |
+| Tool output | 0.5 | 0.05 | 0.12 |
+| Tool output | 1.5 | 0.07 | 0.05 |
 
 : Sensitivity to each entry point's damage value.
 
 ![Sensitivity of the equilibrium to $\lambda$ and to the damage values.](figures/sensitivity.png){width=90%}
 
-The payoff measurement was repeated with a second model family, `ollama:llama3.2`, at 1 trials per setting. Its normal-task success with no guardrail was 75% and its mean attack success with no guardrail was 44%. The policy solved for `ollama:gemma4` has a predicted worst case of 0.60 when it is evaluated on the second model's payoffs, against 0.07 for the policy solved for that model directly, a transfer penalty of 0.53. The two policies differ by a mean total-variation distance of 0.31.
+$\lambda$ had no effect, because no guardrail blocked a benign segment in the payoff runs: every false-block rate in Table 2 is zero, so the false-block term of the objective is zero for every policy. Halving or raising one damage value by half kept the worst case between 0.05 and 0.07 (baseline 0.06) and moved the mix by at most 0.16. The equilibrium is stable under these changes.
+
+**Planning for the confidence interval.** The linear program treats each measured success rate as exact. A judge cell with no successes in 20 trials is read as a perfect guardrail, although its upper 95% bound is 0.16. Table 8 re-solves the game with every success rate set to its upper Wilson bound (mean upper bound: none 0.51, classifier 0.25, llm judge 0.16), and keeps, among the policies that are optimal under those pessimistic payoffs, the one that is best under the point estimates. The columns give each policy's worst case under the point estimates (point) and under the upper bounds (upper).
+
+| Budget | Point pol. (point) | Point pol. (upper) | Robust (point) | Robust (upper) | Judge all (upper) | Shift |
+|:--|--:|--:|--:|--:|--:|--:|
+| 0.10 | 0.14 | 0.34 | 0.24 | 0.32 | 0.16 | 0.19 |
+| 0.20 | 0.11 | 0.30 | 0.13 | 0.26 | 0.16 | 0.09 |
+| 0.30 | 0.09 | 0.28 | 0.11 | 0.24 | 0.16 | 0.10 |
+| 0.40 | 0.07 | 0.26 | 0.10 | 0.22 | 0.16 | 0.13 |
+| 0.50 | 0.06 | 0.24 | 0.09 | 0.20 | 0.16 | 0.12 |
+| 0.75 | 0.03 | 0.20 | 0.05 | 0.16 | 0.16 | 0.11 |
+| 1.00 | 0.00 | 0.16 | 0.00 | 0.16 | 0.16 | 0.00 |
+
+: Worst-case damage of the point-estimate policy and of the robust policy, evaluated under the point estimates and under the upper 95% bounds.
+
+Planning for the upper bounds lowers the pessimistic worst case by up to 0.04 and costs at most 0.10 under the point estimates. Under the upper bounds, no policy gets below 0.16, the bound of judge everywhere, and the robust policy reaches it only from a budget of 1.00. With 20 trials per cell the data cannot certify a worst case below that value, so the point-estimate curve in Figure 2 should be read as an estimate and Table 8 as the guarantee.
+
+The payoff measurement was repeated with a second model family, `ollama:llama3.2`, at 8 trials per setting. Its normal-task success with no guardrail was 78% and its mean attack success with no guardrail was 47%. The policy solved for `ollama:gemma4` has a predicted worst case of 0.31 when it is evaluated on the second model's payoffs, against 0.26 for the policy solved for that model directly, a transfer penalty of 0.05. The two policies differ by a mean total-variation distance of 0.55. The second model missed the 85% normal-task target, so its payoffs are a rougher estimate. The equilibrium therefore transfers across model families with a modest loss, but the mix itself depends on the model, and a deployment should measure its own payoffs.
 
 # Discussion and limitations
 
-The equilibrium policy cannot do worse than random or greedy placement in predicted worst-case damage,
-because both are feasible solutions of the program it optimizes. What the experiments can show is how large
-the margin is with measured payoffs, and whether the prediction survives contact with an attacker that
-writes its own text.
+The equilibrium policy cannot do worse than random or greedy placement in predicted worst-case damage, because both are feasible solutions of the program it optimizes. What the experiments show is the size of the margin with measured payoffs. At 20% of the judge-everywhere cost, the equilibrium's predicted worst case was 0.11, against 0.64 for random and 0.63 for greedy placement, and 0.20 for the classifier everywhere. The reason is visible in the payoff table: the classifier stops every direct override but lets through many of the role-play and split attacks, and the judge stops almost everything. The equilibrium uses the cheap classifier as a base layer and spends the budget on judge checks where the classifier's gaps are most valuable to an attacker, so that no entry point stands out.
+
+Against the LLM attacker the equilibrium's realized damage was 0.00 at a budget of 0.25, 0.04 at a budget of 0.50, 0.00 at a budget of 0.75, always at or below its prediction. The attacker did not search the policy for its weakest point; it mostly attacked the entry point with the highest damage value. This matches the concern in [3] that LLM players need not follow equilibrium reasoning, and it has a practical consequence: a policy that looks safe against this attacker, such as greedy placement, can still be exploited by an attacker who reads the policy carefully. The equilibrium's guarantee does not depend on the attacker's skill, which is the point of committing to it.
 
 Several limits apply to any reading of the results. The payoffs are estimates from a finite number of
-trials, and the linear program treats them as exact; an entry in the payoff table that is zero by chance
-makes the solver believe a guardrail is perfect there. The workspace is synthetic and each task reads a
-single document, so the traffic weights are parameters of the model and not something the experiments
-measure. The classifier is deliberately small. The judge and the agent may be the same model family when
-the judge runs locally, which could make the judge better at spotting exactly the text its sibling would
-obey. Finally, the attacker is an LLM following a prompt. If it fails to pick the best target, that is a
-result about this attacker and this prompt, and a human adversary may do better.
+trials, and the linear program treats them as exact; Table 8 shows how much the guarantee weakens when the
+upper confidence bounds are used instead. The workspace is synthetic and each task reads a single document,
+so the traffic weights are parameters of the model and not something the experiments measure. The classifier
+is deliberately small. The judge reads one segment at a time, which a split attack can exploit, as one
+attacker run showed. The judge and the agent were the same model family, which could make the judge better
+at spotting exactly the text its sibling would obey; the second-model run tests the agent side of this but
+not the judge side. Finally, the attacker is an LLM following a prompt. Its failure to find best responses is
+a result about this attacker and this prompt, and a human adversary may do better.
 
 # Reproducing the results
 

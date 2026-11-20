@@ -1,0 +1,7 @@
+{
+  "name": "guardeq-presentation",
+  "private": true,
+  "description": "Builds the GuardEQ results deck from results/<profile>/",
+  "scripts": { "build": "node build_deck.js" },
+  "dependencies": { "pptxgenjs": "^3.12.0" }
+}

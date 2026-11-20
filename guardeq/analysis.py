@@ -105,9 +105,9 @@ def fig_eval(data: dict, path: Path) -> None:
         ax.scatter(range(len(names)), [cell[n]["predicted_worst_case"] for n in names], marker="_", s=260,
                    color="#1C1B22", zorder=5, label="Predicted worst case")
         ax.set_title(f"Budget {f:.2f}", fontsize=10)
-        ax.set_xticks(range(len(names)), [POLICY_LABELS[n].split(" (")[0].replace(" everywhere", "\neverywhere")
-                                          .replace(", same", ",\nsame").replace(" by", "\nby") for n in names],
-                      fontsize=7)
+        short = {"sse": "GuardEQ", "none": "None", "classifier": "Classifier\nall", "judge": "Judge\nall",
+                 "random": "Random", "greedy": "Greedy"}
+        ax.set_xticks(range(len(names)), [short.get(n, n) for n in names], fontsize=8, rotation=45, ha="right")
     axes[0][0].set_ylabel("Damage against the LLM attacker")
     axes[0][-1].legend(frameon=False, fontsize=8)
     fig.tight_layout()

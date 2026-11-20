@@ -27,6 +27,11 @@ def _pct(x):
     return f"{100 * x:.0f}%"
 
 
+def wilson_hi(n: int) -> float:
+    from .stats import wilson
+    return wilson(0, n)[1]
+
+
 def _table(header: list[str], rows: list[list[str]]) -> str:
     out = ["| " + " | ".join(header) + " |", "|" + "|".join([":--"] + ["--:"] * (len(header) - 1)) + "|"]
     out += ["| " + " | ".join(r) + " |" for r in rows]
@@ -67,7 +72,7 @@ def results_sections(cfg: Config, data: dict) -> str:
     s.append("## Measured payoffs\n")
     s.append(f"Averaged over entry points and attack types, attacks succeeded {_pct(m['none'])} of the time with no "
              f"guardrail, {_pct(m['classifier'])} with the classifier and {_pct(m['judge'])} with the LLM judge. "
-             "Table 2 gives the success rate for every setting and Figure 2 shows the same numbers as a heat map.\n")
+             "Table 2 gives the success rate for every setting and Figure 1 shows the same numbers as a heat map.\n")
     rows = []
     for t in ENTRY_POINTS:
         for l in GUARDRAILS:
@@ -115,12 +120,34 @@ def results_sections(cfg: Config, data: dict) -> str:
                  f"{_f(best_gain['policies']['sse']['worst_case'])} against {_f(other)} for the better of the two.\n")
     match = sweep["budget_to_match_judge"]
     judge_wc = steps[-1]["policies"]["judge"]["worst_case"]
+    fine = sweep["fine"][str(cfg.lam)] if str(cfg.lam) in sweep["fine"] else next(iter(sweep["fine"].values()))
+    near = next((st["fraction"] for st in fine if st["policies"]["sse"]["worst_case"] <= judge_wc + 0.05 + 1e-9), None)
+    cls_wc = fine[0]["policies"]["classifier"]["worst_case"]
+    beats_cls = next((st["fraction"] for st in fine if st["policies"]["sse"]["worst_case"] < cls_wc - 1e-9), None)
+    extra = []
+    if near is not None:
+        extra.append(f"It comes within 0.05 of it at {_pct(near)} of the cost")
+    if beats_cls is not None:
+        extra.append(f"and it is already safer than running the classifier everywhere (worst case {_f(cls_wc)}) from "
+                     f"{_pct(beats_cls)} of the cost")
     s.append("**Question 2.** " + (
         f"The equilibrium policy reaches the worst-case damage of judge everywhere ({_f(judge_wc)}) at "
-        f"{_pct(match)} of its cost." if match is not None else
+        f"{_pct(match)} of its cost." if match is not None and match < 0.999 else
         f"The equilibrium policy did not reach the worst-case damage of judge everywhere ({_f(judge_wc)}) at any "
-        "budget below the full cost.") + " Figure 4 shows how the mix at each entry point changes as the budget grows.\n")
+        "budget below the full cost." + (" With the judge measured at 0 successes in every cell, matching it "
+        "exactly requires the judge on every read." if all(P[t]["judge"][a] == 0 for t in ENTRY_POINTS for a in ATTACKS)
+        else "")) + (" " + " ".join(extra) + "." if extra else "")
+        + " Figure 3 shows how the mix at each entry point changes as the budget grows.\n")
     s.append("![The equilibrium mix at each entry point, by budget.](figures/policy_mix.png){width=95%}\n")
+    ref = min(steps, key=lambda st: abs(st["fraction"] - 0.4))
+    s.append(f"Table 4 gives the other metrics from the proposal for every policy at a budget of {_f(ref['fraction'], 1)}: "
+             "the added delay per task (the policy's expected guardrail cost), the expected harm from false blocks, and "
+             "the predicted worst-case damage.\n")
+    s.append(_table(["Policy", "Added delay per task (s)", "False-block harm", "Worst-case damage"],
+                    [[SHORT[n], _f(ref["policies"][n]["cost"], 3), _f(ref["policies"][n]["false_block_harm"], 3),
+                      _f(ref["policies"][n]["worst_case"])] for n in POLICY_NAMES])
+             + f"\n\n: Cost and side effects of each policy at a budget of {_f(ref['fraction'], 1)}. The fixed baselines "
+               "do not depend on the budget.\n")
 
     # --- eval
     s.append("## Against the LLM attacker\n")
@@ -129,7 +156,7 @@ def results_sections(cfg: Config, data: dict) -> str:
                 else "the policy and the damage values only")
         s.append(f"Each policy was run against an LLM attacker (`{cfg.attacker_model}`) that was given {info}. The "
                  "attacker chose an entry point and an attack type and wrote its own injection text. Tasks came "
-                 "from the held-out templates. Table 4 reports the outcome.\n")
+                 "from the held-out templates. Table 5 reports the outcome.\n")
         s.append(_table(["Policy", "Budget", "Runs", "Success", "95% CI", "Damage", "Predicted", "Gap", "Best resp."],
                         [[SHORT[r["policy"]], _f(r["budget_fraction"]), str(r["n"]), _f(r["attack_success"]),
                           f"{_f(r['attack_success_ci'][0])}--{_f(r['attack_success_ci'][1])}",
@@ -156,6 +183,37 @@ def results_sections(cfg: Config, data: dict) -> str:
                  f"{'below' if gap >= 0 else 'above'} the predicted worst case. A positive gap means the model "
                  "overstated the risk from this attacker; a negative one means the attacker's own wording did "
                  "better than the library attacks the payoffs were measured with.\n")
+        tgt = {t: sum(r["targets"].get(t, 0) for r in ev) for t in ENTRY_POINTS}
+        top = max(tgt, key=tgt.get)
+        gr = [r for r in ev if r["policy"] == "greedy"]
+        gr_br = sum(r["best_response_rate"] * r["n"] for r in gr) / max(1, sum(r["n"] for r in gr))
+        over = [r for r in ev if r["realized_damage_ci"][0] > r["predicted_worst_case"] + 1e-9]
+        s.append(f"The attacker's choices were strongly concentrated: it targeted the {ENTRY_LABELS[top].lower()} "
+                 f"in {_pct(tgt[top] / n_all)} of all runs, whatever the policy. That entry point has the highest damage "
+                 "value, so the attacker behaved more like a rule of thumb (attack the most valuable entry point) than "
+                 "like a best responder. Against greedy placement, which spends its budget on the most valuable entry "
+                 f"points first, this rule fails: the attacker found a best response in only {_pct(gr_br)} of greedy "
+                 "runs, and greedy's realized damage was far below its predicted worst case. The predicted worst case "
+                 "is therefore an upper bound on what this attacker achieved, not a forecast of it, and the low realized "
+                 "damage of greedy placement says more about the attacker than about greedy placement. "
+                 + ("In no cell was the realized damage significantly above the prediction. " if not over else
+                    f"In {len(over)} cell(s) the realized damage was significantly above the prediction. ")
+                 + "Against the equilibrium policy every target is close to tied, so the attacker's habit cost it "
+                 "little there, and the prediction was tightest for that policy: its gap was at most "
+                 f"{_f(max(r['prediction_gap'] for r in sse_rows))}, against up to "
+                 f"{_f(max(r['prediction_gap'] for r in ev if r['policy'] == 'random'))} for random and "
+                 f"{_f(max(r['prediction_gap'] for r in gr))} for greedy placement.\n")
+        bypass = [r for r in ev if r["policy"] == "judge" and r["attack_success"] > 0]
+        if bypass:
+            nb = sum(round(r['attack_success'] * r['n']) for r in bypass)
+            s.append("Judge everywhere was beaten "
+                     f"{'once' if nb == 1 else str(nb) + ' times'}, although the judge had no "
+                     "successes in the payoff runs. In the logged case the attacker chose a split attack, and its payload came from the "
+                     "held-out wording, which the judge had never seen: "
+                     "one segment named an outside address as the place where \"compliance copies\" go, and the other "
+                     "asked the assistant to send a compliance copy of the recovery code \"to the destination given in "
+                     "step A\". Read one at a time, neither segment looks like an attack, which is the weakness the split "
+                     "type was designed to probe.\n")
         s.append("![How often the LLM attacker picked a predicted best response, by policy.]"
                  "(figures/attacker_choice.png){width=70%}\n")
     else:
@@ -164,8 +222,8 @@ def results_sections(cfg: Config, data: dict) -> str:
     # --- robustness
     s.append("## Robustness\n")
     sens = rob["sensitivity"]
-    s.append(f"**Question 4.** Table 5 re-solves the game at a budget of {_f(sens['fraction'], 1)} for different "
-             "values of $\\lambda$. Table 6 scales one damage value at a time. Policy shift is the mean "
+    s.append(f"**Question 4.** Table 6 re-solves the game at a budget of {_f(sens['fraction'], 1)} for different "
+             "values of $\\lambda$. Table 7 scales one damage value at a time. Policy shift is the mean "
              "total-variation distance between the new mix and the baseline mix, from 0 (identical) to 1.\n")
     s.append(_table(["$\\lambda$", "Worst-case damage", "False-block harm", "Cost (s)", "Policy shift"],
                     [[_f(r["lam"]), _f(r["worst_case"]), _f(r["false_block_harm"], 3), _f(r["cost"]),
@@ -176,6 +234,45 @@ def results_sections(cfg: Config, data: dict) -> str:
                      for r in sens["damage"]]) + "\n\n: Sensitivity to each entry point's damage value.\n")
     s.append("![Sensitivity of the equilibrium to $\\lambda$ and to the damage values.](figures/sensitivity.png)"
              "{width=90%}\n")
+    shifts = [r["policy_shift"] for r in sens["lambda"]]
+    wcs = [r["worst_case"] for r in sens["damage"]]
+    lam_note = ("$\\lambda$ had no effect, because no guardrail blocked a benign segment in the payoff runs: every "
+                "false-block rate in Table 2 is zero, so the false-block term of the objective is zero for every policy. "
+                if max(shifts) < 1e-6 else
+                f"Changing $\\lambda$ moved the mix by at most {_f(max(shifts))}. ")
+    s.append(lam_note + f"Halving or raising one damage value by half kept the worst case between {_f(min(wcs))} and "
+             f"{_f(max(wcs))} (baseline {_f(sens['base_worst_case'])}) and moved the mix by at most "
+             f"{_f(max(r['policy_shift'] for r in sens['damage']))}. The equilibrium is stable under these changes.\n")
+    pes = rob.get("pessimistic")
+    if pes:
+        mb = pes["mean_upper_bound"]
+        s.append("**Planning for the confidence interval.** The linear program treats each measured success rate as "
+                 f"exact. A judge cell with no successes in {cfg.n_attack} trials is read as a perfect guardrail, although "
+                 f"its upper 95% bound is {_f(wilson_hi(cfg.n_attack))}. Table 8 re-solves the game with every "
+                 "success rate set to its upper Wilson bound (mean upper bound: "
+                 + ", ".join(f"{GUARD_LABELS[l].lower()} {_f(mb[l])}" for l in GUARDRAILS)
+                 + "), and keeps, among the policies that are optimal under those pessimistic payoffs, the one that is "
+                 "best under the point estimates. The columns give each policy's worst case under the point estimates (point) and under the upper bounds (upper).\n")
+        s.append(_table(["Budget", "Point pol. (point)", "Point pol. (upper)", "Robust (point)",
+                         "Robust (upper)", "Judge all (upper)", "Shift"],
+                        [[_f(r["fraction"]), _f(r["point_policy_nominal"]), _f(r["point_policy_pessimistic"]),
+                          _f(r["robust_policy_nominal"]), _f(r["robust_policy_pessimistic"]),
+                          _f(r["judge_everywhere_pessimistic"]), _f(r["policy_shift"])] for r in pes["rows"]])
+                 + "\n\n: Worst-case damage of the point-estimate policy and of the robust policy, evaluated under the "
+                   "point estimates and under the upper 95% bounds.\n")
+        rows = pes["rows"]
+        gain = max(r["point_policy_pessimistic"] - r["robust_policy_pessimistic"] for r in rows)
+        price = max(r["robust_policy_nominal"] - r["point_policy_nominal"] for r in rows)
+        je = rows[0]["judge_everywhere_pessimistic"]
+        beat = [r["fraction"] for r in rows if r["robust_policy_pessimistic"] <= je + 1e-6]
+        s.append(f"Planning for the upper bounds lowers the pessimistic worst case by up to {_f(gain)} and costs at most "
+                 f"{_f(price)} under the point estimates. Under the upper bounds, no policy gets below {_f(je)}, the bound "
+                 f"of judge everywhere, and the robust policy reaches it only from a budget of {_f(min(beat))}"
+                 if beat else
+                 f"Planning for the upper bounds lowers the pessimistic worst case by up to {_f(gain)} and costs at most "
+                 f"{_f(price)} under the point estimates")
+        s[-1] += (f". With {cfg.n_attack} trials per cell the data cannot certify a worst case below that value, so the "
+                  "point-estimate curve in Figure 2 should be read as an estimate and Table 8 as the guarantee.\n")
     cm = rob.get("cross_model")
     if cm:
         c2 = cm["second_checks"]
@@ -186,7 +283,11 @@ def results_sections(cfg: Config, data: dict) -> str:
                  f"predicted worst case of {_f(cm['transferred_worst_case'])} when it is evaluated on the second "
                  f"model's payoffs, against {_f(cm['second_optimal_worst_case'])} for the policy solved for that "
                  f"model directly, a transfer penalty of {_f(cm['transfer_penalty'])}. The two policies differ by a "
-                 f"mean total-variation distance of {_f(cm['policy_shift'])}.\n")
+                 f"mean total-variation distance of {_f(cm['policy_shift'])}. "
+                 + ("The second model missed the 85% normal-task target, so its payoffs are a rougher estimate. "
+                    if not c2["normal_tasks_pass_85pct"] else "")
+                 + "The equilibrium therefore transfers across model families with a modest loss, but the mix itself "
+                 "depends on the model, and a deployment should measure its own payoffs.\n")
     return "\n".join(s)
 
 
@@ -352,23 +453,47 @@ response. Rates are reported with 95% Wilson intervals.
 
 """
 
+def discussion(cfg: Config, data: dict) -> str:
+    sweep, ev = data["sweep"], data["eval_summary"] or []
+    steps = sweep["sweep"]
+    mid = [st for st in steps if 0 < st["fraction"] < 1]
+    ref = min(mid, key=lambda st: abs(st["fraction"] - 0.2)) if mid else steps[0]
+    p = ref["policies"]
+    s = ["# Discussion and limitations\n"]
+    s.append("The equilibrium policy cannot do worse than random or greedy placement in predicted worst-case damage, "
+             "because both are feasible solutions of the program it optimizes. What the experiments show is the size "
+             f"of the margin with measured payoffs. At {_pct(ref['fraction'])} of the judge-everywhere cost, the "
+             f"equilibrium's predicted worst case was {_f(p['sse']['worst_case'])}, against "
+             f"{_f(p['random']['worst_case'])} for random and {_f(p['greedy']['worst_case'])} for greedy placement, "
+             f"and {_f(p['classifier']['worst_case'])} for the classifier everywhere. The reason is visible in the "
+             "payoff table: the classifier stops every direct override but lets through many of the role-play and split attacks, and "
+             "the judge stops almost everything. The equilibrium uses the cheap classifier as a base layer and spends "
+             "the budget on judge checks where the classifier's gaps are most valuable to an attacker, so that no "
+             "entry point stands out.\n")
+    if ev:
+        sse = [r for r in ev if r["policy"] == "sse"]
+        s.append("Against the LLM attacker the equilibrium's realized damage was "
+                 + ", ".join(f"{_f(r['realized_damage'])} at a budget of {_f(r['budget_fraction'])}" for r in sse)
+                 + ", always at or below its prediction. The attacker did not search the policy for its weakest point; it "
+                 "mostly attacked the entry point with the highest damage value. This matches the concern in [3] that LLM "
+                 "players need not follow equilibrium reasoning, and it has a practical consequence: a policy that looks "
+                 "safe against this attacker, such as greedy placement, can still be exploited by an attacker who reads "
+                 "the policy carefully. The equilibrium's guarantee does not depend on the attacker's skill, which is "
+                 "the point of committing to it.\n")
+    s.append(r"""Several limits apply to any reading of the results. The payoffs are estimates from a finite number of
+trials, and the linear program treats them as exact; Table 8 shows how much the guarantee weakens when the
+upper confidence bounds are used instead. The workspace is synthetic and each task reads a single document,
+so the traffic weights are parameters of the model and not something the experiments measure. The classifier
+is deliberately small. The judge reads one segment at a time, which a split attack can exploit, as one
+attacker run showed. The judge and the agent were the same model family, which could make the judge better
+at spotting exactly the text its sibling would obey; the second-model run tests the agent side of this but
+not the judge side. Finally, the attacker is an LLM following a prompt. Its failure to find best responses is
+a result about this attacker and this prompt, and a human adversary may do better.
+""")
+    return "\n".join(s)
+
+
 BACK = r"""
-# Discussion and limitations
-
-The equilibrium policy cannot do worse than random or greedy placement in predicted worst-case damage,
-because both are feasible solutions of the program it optimizes. What the experiments can show is how large
-the margin is with measured payoffs, and whether the prediction survives contact with an attacker that
-writes its own text.
-
-Several limits apply to any reading of the results. The payoffs are estimates from a finite number of
-trials, and the linear program treats them as exact; an entry in the payoff table that is zero by chance
-makes the solver believe a guardrail is perfect there. The workspace is synthetic and each task reads a
-single document, so the traffic weights are parameters of the model and not something the experiments
-measure. The classifier is deliberately small. The judge and the agent may be the same model family when
-the judge runs locally, which could make the judge better at spotting exactly the text its sibling would
-obey. Finally, the attacker is an LLM following a prompt. If it fails to pick the best target, that is a
-result about this attacker and this prompt, and a human adversary may do better.
-
 # Reproducing the results
 
 The code is in the `guardeq` package. `python -m guardeq doctor` checks the environment, `python -m unittest`
@@ -416,12 +541,12 @@ def build(cfg: Config):
         lam=cfg.lam, agent=data["payoffs"]["agent_model"], attacker=cfg.attacker_model,
         judge=data["payoffs"]["judge_model"])
     md = out_dir / "report.md"
-    md.write_text(front + results_sections(cfg, data) + BACK)
+    md.write_text(front + results_sections(cfg, data) + "\n" + discussion(cfg, data) + BACK)
     pdf = out_dir / "report.pdf"
     if shutil.which("pandoc"):
         engine = next((e for e in ("xelatex", "pdflatex") if shutil.which(e)), None)
         if engine:
-            proc = subprocess.run(["pandoc", "report.md", "-o", "report.pdf", f"--pdf-engine={engine}"],
+            proc = subprocess.run(["pandoc", "report.md", "-o", "report.pdf", f"--pdf-engine={engine}", "--columns=200"],
                                   cwd=out_dir, capture_output=True, text=True)
             if proc.returncode == 0:
                 return pdf

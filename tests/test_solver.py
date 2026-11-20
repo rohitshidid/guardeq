@@ -75,6 +75,15 @@ class Structure(unittest.TestCase):
             gs = solve_general_sum(self.P, self.R, self.V, self.V, self.F, self.K, B, lam=0.5)
             self.assertAlmostEqual(zs["objective"], gs["objective"], places=4)
 
+    def test_cap_constraint_keeps_the_other_tables_optimum(self):
+        P_hi = {t: {l: {a: min(1.0, v + 0.15) for a, v in row.items()} for l, row in g.items()} for t, g in self.P.items()}
+        first = solve_sse(P_hi, self.R, self.V, self.F, self.K, 1.0, lam=0.5)
+        second = solve_sse(self.P, self.R, self.V, self.F, self.K, 1.0, lam=0.5, cap_P=P_hi, cap_z=first["worst_case"] + 1e-6)
+        hi = evaluate_policy(second["policy"], P_hi, self.R, self.V, self.F, self.K)["worst_case"]
+        self.assertLessEqual(hi, first["worst_case"] + 1e-5)
+        unconstrained = solve_sse(self.P, self.R, self.V, self.F, self.K, 1.0, lam=0.5)
+        self.assertGreaterEqual(second["worst_case"], unconstrained["worst_case"] - 1e-6)
+
     def test_general_sum_attacker_target_is_a_best_response(self):
         U = {"e": 0.2, "w": 1.0, "f": 0.4}
         gs = solve_general_sum(self.P, self.R, self.V, U, self.F, self.K, 1.0, lam=0.5)

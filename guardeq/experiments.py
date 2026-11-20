@@ -166,7 +166,7 @@ def summarize_eval(cfg: Config, records: list[dict]) -> list[dict]:
             rows.append({
                 "budget_fraction": f, "policy": name, "n": n,
                 "attack_success": k / n, "attack_success_ci": wilson(k, n),
-                "realized_damage": dmg, "realized_damage_ci": (lo, hi),
+                "realized_damage": dmg, "realized_damage_ci": (max(0.0, lo), hi),  # damage is never negative
                 "predicted_worst_case": z, "prediction_gap": z - dmg,
                 "best_response_rate": br / n, "best_response_ci": wilson(br, n),
                 "mean_regret": sum(r["predicted_worst_case"] - r["chosen_predicted_damage"] for r in cell) / n,
@@ -204,6 +204,36 @@ def sensitivity(cfg: Config, pay: dict, fraction: float = 0.5) -> dict:
             out["damage"].append({"entry_point": t, "scale": scale, "worst_case": s["worst_case"],
                                   "policy_shift": policy_distance(base["policy"], s["policy"])})
     return out
+
+
+def pessimistic(cfg: Config, pay: dict, fractions=(0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0)) -> dict:
+    """Plan against the upper 95% bound of every attack-success estimate instead of the point estimate.
+
+    A cell with 0 successes in n trials is not a perfect guardrail. Solving with the Wilson upper bound
+    gives a policy whose worst case is guaranteed under every payoff table inside the intervals."""
+    P_hi = {t: {l: {a: pay["P_detail"][t][l][a]["ci"][1] for a in ATTACKS} for l in GUARDRAILS} for t in ENTRY_POINTS}
+    full = judge_everywhere_cost(pay["P"], cfg.traffic, pay["K"])
+    rows = []
+    for f in fractions:
+        B = f * full
+        point = solve_sse(pay["P"], pay["R"], cfg.damage, cfg.traffic, pay["K"], B, cfg.lam)
+        first = solve_sse(P_hi, pay["R"], cfg.damage, cfg.traffic, pay["K"], B, cfg.lam)
+        # Among policies that achieve the pessimistic optimum, take the one that is best nominally.
+        robust = solve_sse(pay["P"], pay["R"], cfg.damage, cfg.traffic, pay["K"], B, cfg.lam,
+                           cap_P=P_hi, cap_z=first["worst_case"] + 1e-6)
+        robust["worst_case"] = evaluate_policy(robust["policy"], P_hi, pay["R"], cfg.damage, cfg.traffic, pay["K"])["worst_case"]
+        rows.append({
+            "fraction": f,
+            "point_policy_nominal": point["worst_case"],
+            "point_policy_pessimistic": evaluate_policy(point["policy"], P_hi, pay["R"], cfg.damage, cfg.traffic, pay["K"])["worst_case"],
+            "robust_policy_nominal": evaluate_policy(robust["policy"], pay["P"], pay["R"], cfg.damage, cfg.traffic, pay["K"])["worst_case"],
+            "robust_policy_pessimistic": robust["worst_case"],
+            "judge_everywhere_pessimistic": evaluate_policy({t: {l: float(l == "judge") for l in GUARDRAILS} for t in ENTRY_POINTS},
+                                                            P_hi, pay["R"], cfg.damage, cfg.traffic, pay["K"])["worst_case"],
+            "policy_shift": policy_distance(point["policy"], robust["policy"]),
+            "robust_policy": robust["policy"],
+        })
+    return {"rows": rows, "mean_upper_bound": {l: sum(P_hi[t][l][a] for t in ENTRY_POINTS for a in ATTACKS) / 16 for l in GUARDRAILS}}
 
 
 def cross_model(cfg: Config, pay: dict, pay2: dict, fraction: float = 0.5) -> dict:
@@ -251,7 +281,7 @@ def run_all(cfg: Config, steps=("payoffs", "solve", "eval", "robust")) -> dict:
     out["eval"] = summary
 
     print("[4/4] robustness")
-    robust = {"sensitivity": sensitivity(cfg, pay)}
+    robust = {"sensitivity": sensitivity(cfg, pay), "pessimistic": pessimistic(cfg, pay)}
     if "robust" in steps:
         pay2 = measure_payoffs(cfg, log, cfg.second_agent_model, cfg.n_robust, cfg.n_robust)
     else:

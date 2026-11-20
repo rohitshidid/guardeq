@@ -46,13 +46,16 @@ def evaluate_policy(c, P, R, V, F, K, lam: float = 0.0) -> dict:
             "false_block_harm": harm, "objective": z + lam * harm}
 
 
-def solve_sse(P, R, V, F, K, B: float, lam: float = 0.0) -> dict:
+def solve_sse(P, R, V, F, K, B: float, lam: float = 0.0, cap_P=None, cap_z: float | None = None) -> dict:
     """Strong Stackelberg equilibrium of the zero-sum-in-damage game, by one linear program.
 
         min  z + lam * sum_t F_t sum_l c_tl R_tl
         s.t. z >= V_t sum_l c_tl P_tla        for every t, a
              sum_l c_tl = 1                   for every t
              sum_t F_t sum_l c_tl K_l <= B,   c >= 0
+
+    With cap_P and cap_z, also require V_t sum_l c_tl cap_P_tla <= cap_z for every t, a. This is used
+    to pick, among policies that are optimal under one payoff table, the best one under another.
     """
     entries, guards, attacks = _sets(P)
     nT, nL = len(entries), len(guards)
@@ -80,6 +83,14 @@ def solve_sse(P, R, V, F, K, B: float, lam: float = 0.0) -> dict:
             row[idx(i, j)] = F[t] * K[l]
     A_ub.append(row)
     b_ub.append(B)
+    if cap_P is not None:
+        for i, t in enumerate(entries):
+            for a in attacks:
+                row = np.zeros(n)
+                for j, l in enumerate(guards):
+                    row[idx(i, j)] = V[t] * cap_P[t][l][a]
+                A_ub.append(row)
+                b_ub.append(cap_z)
 
     A_eq = np.zeros((nT, n))
     for i in range(nT):

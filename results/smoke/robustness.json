@@ -90,6 +90,232 @@
    }
   ]
  },
+ "pessimistic": {
+  "rows": [
+   {
+    "fraction": 0.1,
+    "point_policy_nominal": 0.2202164914534368,
+    "point_policy_pessimistic": 0.7667864101810877,
+    "robust_policy_nominal": 0.22026328756689126,
+    "robust_policy_pessimistic": 0.6576290471103808,
+    "judge_everywhere_pessimistic": 0.6576280471103807,
+    "policy_shift": 0.11017269587401851,
+    "robust_policy": {
+     "email": {
+      "none": 0.27532910945861405,
+      "classifier": 0.27532910945861405,
+      "judge": 0.44934178108277195
+     },
+     "web": {
+      "none": 0.3671054792781521,
+      "classifier": 0.6328945207218479,
+      "judge": 0.0
+     },
+     "file": {
+      "none": 0.31466183938127323,
+      "classifier": 0.6853381606187268,
+      "judge": 0.0
+     },
+     "tool": {
+      "none": 4.034807508863611e-06,
+      "classifier": 0.9999959651924911,
+      "judge": 0.0
+     }
+    }
+   },
+   {
+    "fraction": 0.2,
+    "point_policy_nominal": 0.04029286226290613,
+    "point_policy_pessimistic": 0.6776006788557297,
+    "robust_policy_nominal": 0.040301424165820714,
+    "robust_policy_pessimistic": 0.6576290471103808,
+    "judge_everywhere_pessimistic": 0.6576280471103807,
+    "policy_shift": 0.020157398900914697,
+    "robust_policy": {
+     "email": {
+      "none": 0.05037678020727589,
+      "classifier": 0.05037678020727589,
+      "judge": 0.8992464395854483
+     },
+     "web": {
+      "none": 0.06716904027636786,
+      "classifier": 0.9328309597236322,
+      "judge": 0.0
+     },
+     "file": {
+      "none": 0.057573463094029595,
+      "classifier": 0.9424265369059704,
+      "judge": 0.0
+     },
+     "tool": {
+      "none": 4.034807508863611e-06,
+      "classifier": 0.9999959651924911,
+      "judge": 0.0
+     }
+    }
+   },
+   {
+    "fraction": 0.3,
+    "point_policy_nominal": 0.0,
+    "point_policy_pessimistic": 0.6576280471103807,
+    "robust_policy_nominal": 0.0,
+    "robust_policy_pessimistic": 0.6576280471103807,
+    "judge_everywhere_pessimistic": 0.6576280471103807,
+    "policy_shift": 0.0,
+    "robust_policy": {
+     "email": {
+      "none": 0.0,
+      "classifier": 0.0,
+      "judge": 1.0
+     },
+     "web": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "file": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "tool": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     }
+    }
+   },
+   {
+    "fraction": 0.4,
+    "point_policy_nominal": 0.0,
+    "point_policy_pessimistic": 0.6576280471103807,
+    "robust_policy_nominal": 0.0,
+    "robust_policy_pessimistic": 0.6576280471103807,
+    "judge_everywhere_pessimistic": 0.6576280471103807,
+    "policy_shift": 0.0,
+    "robust_policy": {
+     "email": {
+      "none": 0.0,
+      "classifier": 0.0,
+      "judge": 1.0
+     },
+     "web": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "file": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "tool": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     }
+    }
+   },
+   {
+    "fraction": 0.5,
+    "point_policy_nominal": 0.0,
+    "point_policy_pessimistic": 0.6576280471103807,
+    "robust_policy_nominal": 0.0,
+    "robust_policy_pessimistic": 0.6576280471103807,
+    "judge_everywhere_pessimistic": 0.6576280471103807,
+    "policy_shift": 0.0,
+    "robust_policy": {
+     "email": {
+      "none": 0.0,
+      "classifier": 0.0,
+      "judge": 1.0
+     },
+     "web": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "file": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "tool": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     }
+    }
+   },
+   {
+    "fraction": 0.75,
+    "point_policy_nominal": 0.0,
+    "point_policy_pessimistic": 0.6576280471103807,
+    "robust_policy_nominal": 0.0,
+    "robust_policy_pessimistic": 0.6576280471103807,
+    "judge_everywhere_pessimistic": 0.6576280471103807,
+    "policy_shift": 0.0,
+    "robust_policy": {
+     "email": {
+      "none": 0.0,
+      "classifier": 0.0,
+      "judge": 1.0
+     },
+     "web": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "file": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "tool": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     }
+    }
+   },
+   {
+    "fraction": 1.0,
+    "point_policy_nominal": 0.0,
+    "point_policy_pessimistic": 0.6576280471103807,
+    "robust_policy_nominal": 0.0,
+    "robust_policy_pessimistic": 0.6576280471103807,
+    "judge_everywhere_pessimistic": 0.6576280471103807,
+    "policy_shift": 0.0,
+    "robust_policy": {
+     "email": {
+      "none": 0.0,
+      "classifier": 0.0,
+      "judge": 1.0
+     },
+     "web": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "file": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     },
+     "tool": {
+      "none": 0.0,
+      "classifier": 1.0,
+      "judge": 0.0
+     }
+    }
+   }
+  ],
+  "mean_upper_bound": {
+   "none": 0.7992738189299197,
+   "classifier": 0.6731182532409278,
+   "judge": 0.6576280471103807
+  }
+ },
  "cross_model": {
   "fraction": 0.5,
   "primary_model": "ollama:gemma4",
